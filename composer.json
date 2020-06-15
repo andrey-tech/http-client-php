@@ -1,7 +1,7 @@
 {
     "name": "andrey-tech/http-client-php",
     "description": "Простой НТТР(S) клиент с троттлингом запросов",
-    "keywords": [ "http", "https", "client", "http-client", "https-client", "http-request", "https-sertificate", "throttling" ],
+    "keywords": [ "http", "https", "client", "http-client", "https-client", "http-request", "https-sertificate", "throttling", "debug" ],
     "homepage": "https://github.com/andrey-tech/http-client-php",
     "minimum-stability": "stable",
     "license": "MIT",
