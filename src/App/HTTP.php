@@ -7,7 +7,7 @@
  * @see https://github.com/andrey-tech/http-client-php
  * @license   MIT
  *
- * @version 2.8.0
+ * @version 2.9.0
  *
  * v1.0.0 (21.06.2019) Начальный релиз
  * v2.0.0 (21.07.2019) Изменения для App
@@ -24,7 +24,8 @@
                        Свойство $useCookies теперь по умолчанию false
  * v2.7.1 (22.05.2020) Исправлен метод throttleCurl(). Изменены отладочные сообщения
  * v2.7.2 (10.06.2020) Рефракторинг
- * v2.8.0 (14.06.2020) Добавлен параметр curlConnectTimeout
+ * v2.8.0 (14.06.2020) Добавлено свойство $curlConnectTimeout
+ * v2.9.0 (15.06.2020) Добавлен параметр $raw в метод getResponse()
  *
  */
 
@@ -187,16 +188,16 @@ class HTTP
 
     /**
      * Отправляет HTTP запрос
-     * @param string $url Адрес запроса
-     * @param string $type Тип запроса
-     * @param array $params Парметры запроса
+     * @param string $url URL запроса
+     * @param string $method Метод запроса
+     * @param array $params Параметры запроса
      * @param array $requestHeaders Заголовки запроса
      * @param array $curlOptions Дополнителльные опции для cURL
      * @return mixed
      */
     public function request(
         string $url,
-        string $type = 'GET',
+        string $method = 'GET',
         array $params = [],
         array $requestHeaders = [],
         array $curlOptions = []
@@ -224,23 +225,23 @@ class HTTP
             curl_setopt($this->curl, CURLOPT_HTTPHEADER, $requestHeaders);
         }
         
-        switch ($type) {
+        switch ($method) {
             case 'GET':
             case 'HEAD':
                 if ($query !== '') {
                     $url .= '?' . $query;
                 }
-                $this->debug("[{$this->requestCounter}] ===> {$type} {$url}", self::DEBUG_URL);
+                $this->debug("[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
                 break;
             case 'POST':
             case 'PUT':
             case 'DELETE':
-                $this->debug("[{$this->requestCounter}] ===> {$type} {$url}", self::DEBUG_URL);
-                curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, $type);
+                $this->debug("[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
+                curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, $method);
                 curl_setopt($this->curl, CURLOPT_POSTFIELDS, $query);
                 break;
             default:
-                throw new AppException("Неизвестный метод запроса {$type}");
+                throw new AppException("Неизвестный метод запроса {$method}");
         }
 
         // Устанавливаем URL запроса
@@ -264,7 +265,7 @@ class HTTP
 
         // Выводим заголовки и тело запроса
         $this->debug($this->curlInfo['request_header'] ?? 'REQUEST HEADERS ???', self::DEBUG_HEADERS);
-        if ($type !== 'GET') {
+        if ($method !== 'GET') {
             $this->debug($query . PHP_EOL, self::DEBUG_CONTENT);
         }
 
@@ -301,12 +302,17 @@ class HTTP
     }
 
     /**
-     * Возвращает тело последнего ответа в сыром виде
+     * Возвращает тело последнего ответа
+     * @param bool $raw Возвращать ответ в сыром виде
      * @return string|null
      */
-    public function getResponse()
+    public function getResponse(bool $raw = true)
     {
-        return $this->response;
+        if ($raw) {
+            return $this->response;
+        }
+
+        return $this->decodeResponse($this->response, $this->getHTTPCode());
     }
 
     /**
