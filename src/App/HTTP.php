@@ -7,7 +7,7 @@
  * @see https://github.com/andrey-tech/http-client-php
  * @license   MIT
  *
- * @version 2.9.0
+ * @version 2.9.1
  *
  * v1.0.0 (21.06.2019) Начальный релиз
  * v2.0.0 (21.07.2019) Изменения для App
@@ -26,6 +26,7 @@
  * v2.7.2 (10.06.2020) Рефракторинг
  * v2.8.0 (14.06.2020) Добавлено свойство $curlConnectTimeout
  * v2.9.0 (15.06.2020) Добавлен параметр $raw в метод getResponse()
+ * v2.9.1 (19.07.2020) Добавлен забытый метод PATCH
  *
  */
 
@@ -114,7 +115,7 @@ class HTTP
 
     /**
      * Ресурс cURL
-     * @var resourse
+     * @var resource
      */
     protected $curl;
 
@@ -126,7 +127,7 @@ class HTTP
 
     /**
      * Тело последнего ответа
-     * @var array
+     * @var string
      */
     protected $response;
 
@@ -235,6 +236,7 @@ class HTTP
                 break;
             case 'POST':
             case 'PUT':
+            case 'PATCH':
             case 'DELETE':
                 $this->debug("[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
                 curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, $method);
@@ -304,7 +306,7 @@ class HTTP
     /**
      * Возвращает тело последнего ответа
      * @param bool $raw Возвращать ответ в сыром виде
-     * @return string|null
+     * @return mixed
      */
     public function getResponse(bool $raw = true)
     {
