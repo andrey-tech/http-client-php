@@ -1,13 +1,14 @@
 <?php
+
 /**
  * Простой HTTP(S) клиент с троттлингом запросов
  *
  * @author    andrey-tech
- * @copyright 2019-2020 andrey-tech
+ * @copyright 2019-2021 andrey-tech
  * @see https://github.com/andrey-tech/http-client-php
  * @license   MIT
  *
- * @version 2.9.1
+ * @version 3.0.0
  *
  * v1.0.0 (21.06.2019) Начальный релиз
  * v2.0.0 (21.07.2019) Изменения для App
@@ -23,21 +24,22 @@
  * v2.7.0 (12.05.2020) Свойство $throttle теперь это число запросов в секунду.
                        Свойство $useCookies теперь по умолчанию false
  * v2.7.1 (22.05.2020) Исправлен метод throttleCurl(). Изменены отладочные сообщения
- * v2.7.2 (10.06.2020) Рефракторинг
+ * v2.7.2 (10.06.2020) Рефакторинг
  * v2.8.0 (14.06.2020) Добавлено свойство $curlConnectTimeout
  * v2.9.0 (15.06.2020) Добавлен параметр $raw в метод getResponse()
  * v2.9.1 (19.07.2020) Добавлен забытый метод PATCH
+ * v3.0.0 (06.02.2021) Изменение пространства имен на \App\HTTP
  *
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
-namespace App;
+namespace App\HTTP;
 
 class HTTP
 {
     /**
-     * Битовые маски для указания уровня вывода отладочной информации (для $debugLevel)
+     * Битовые маски для указания уровня вывода отладочной информации в свойстве $debugLevel
      * @var int
      */
     const DEBUG_NONE    = 0; // 000 - не выводить
@@ -46,8 +48,11 @@ class HTTP
     const DEBUG_CONTENT = 1 << 2; // 100 - содержимое запросов/ответов
 
     /**
-     * Уровень вывода отладочной информации
-     * \App\HTTP::DEBUG_URL | \App\HTTP::DEBUG_HEADERS | \App\HTTP::DEBUG_CONTENT
+     * Битовая маска уровня вывода отладочной информации
+     * \App\HTTP\HTTP::DEBUG_NONE,
+     * \App\HTTP\HTTP::DEBUG_URL,
+     * \App\HTTP\HTTP::DEBUG_HEADERS,
+     * \App\HTTP\HTTP::DEBUG_CONTENT
      * @var int
      */
     public $debugLevel = self::DEBUG_NONE;
@@ -80,7 +85,7 @@ class HTTP
      * Флаг включения проверки SSL-сертификата сервера
      * @var bool
      */
-    public $verifySSLCerfificate = true;
+    public $verifySSLCertificate = true;
 
     /**
      * Файл SSL-сертификатов X.509 корневых удостоверяющих центров (относительно каталога файла данного класса)
@@ -93,7 +98,7 @@ class HTTP
      * UserAgent в запросах
      * @var string
      */
-    public $userAgent = 'HTTP-client/2.x.x';
+    public $userAgent = 'HTTP-client/3.x.x';
 
     /**
      * Таймаут соединения для cUrl, секунд
@@ -101,7 +106,7 @@ class HTTP
      */
     public $curlConnectTimeout = 60;
 
-   /**
+    /**
      * Таймаут обмена данными для cUrl, секунд
      * @var integer
      */
@@ -117,46 +122,45 @@ class HTTP
      * Ресурс cURL
      * @var resource
      */
-    protected $curl;
+    private $curl;
 
     /**
      * Информация о последней операции curl
      * @var array
      */
-    protected $curlInfo = [];
+    private $curlInfo = [];
 
     /**
      * Тело последнего ответа
      * @var string
      */
-    protected $response;
+    private $response;
 
     /**
      * Заголовки последнего ответа
      * @var array
      */
-    protected $responseHeaders = [];
+    private $responseHeaders = [];
 
     /**
      * Время последнего запроса, микросекунды
      * @var float
      */
-    protected $lastRequestTime = 0;
+    private $lastRequestTime = 0;
 
     /**
      * Счетчик числа запросов для отладочных сообщений
      * @var integer
      */
-    protected $requestCounter = 0;
+    private $requestCounter = 0;
 
     /**
      * Устанавливает параметры по умолчанию для cURL
      * @return void
      */
-    protected function setDefaultCurlOptions()
+    private function setDefaultCurlOptions()
     {
         $this->responseHeaders = [];
-
         curl_setopt($this->curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($this->curl, CURLOPT_USERAGENT, $this->userAgent);
         curl_setopt($this->curl, CURLOPT_HEADER, false);
@@ -173,16 +177,18 @@ class HTTP
         curl_setopt($this->curl, CURLINFO_HEADER_OUT, true);
         curl_setopt($this->curl, CURLOPT_HEADERFUNCTION, [ $this, 'storeResponseHeaders' ]);
 
-        // Включение проверки SSL-сертификата сервера
-        if ($this->verifySSLCerfificate) {
+        // Включение/отключение проверки SSL-сертификата сервера
+        if ($this->verifySSLCertificate) {
             curl_setopt($this->curl, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($this->curl, CURLOPT_SSL_VERIFYHOST, 2);
             if ($this->sslCertificateFile) {
-                $sslCertificateFile = dirname(__FILE__) . DIRECTORY_SEPARATOR . $this->sslCertificateFile;
+                $sslCertificateFile = __DIR__ . DIRECTORY_SEPARATOR . $this->sslCertificateFile;
                 curl_setopt($this->curl, CURLOPT_CAINFO, $sslCertificateFile);
             }
         } else {
+            /** @noinspection CurlSslServerSpoofingInspection */
             curl_setopt($this->curl, CURLOPT_SSL_VERIFYHOST, 0);
+            /** @noinspection CurlSslServerSpoofingInspection */
             curl_setopt($this->curl, CURLOPT_SSL_VERIFYPEER, 0);
         }
     }
@@ -193,7 +199,7 @@ class HTTP
      * @param string $method Метод запроса
      * @param array $params Параметры запроса
      * @param array $requestHeaders Заголовки запроса
-     * @param array $curlOptions Дополнителльные опции для cURL
+     * @param array $curlOptions Дополнительные опции для cURL
      * @return mixed
      */
     public function request(
@@ -209,11 +215,11 @@ class HTTP
         // Увеличиваем счетчик числа отправленных запросов
         $this->requestCounter++;
 
-        // Инициализацируем cURL и устанавливаем опции по умолчанию
+        // Инициализируем cURL и устанавливаем опции по умолчанию
         $this->curl = curl_init();
         $this->setDefaultCurlOptions();
 
-        // Установливаем дополнительные опции cURL
+        // Устанавливаем дополнительные опции cURL
         if (count($curlOptions)) {
             curl_setopt_array($this->curl, $curlOptions);
         }
@@ -225,14 +231,13 @@ class HTTP
         if (count($requestHeaders)) {
             curl_setopt($this->curl, CURLOPT_HTTPHEADER, $requestHeaders);
         }
-        
+
         switch ($method) {
             case 'GET':
             case 'HEAD':
                 if ($query !== '') {
                     $url .= '?' . $query;
                 }
-                $this->debug("[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
                 break;
             case 'POST':
             case 'PUT':
@@ -243,7 +248,7 @@ class HTTP
                 curl_setopt($this->curl, CURLOPT_POSTFIELDS, $query);
                 break;
             default:
-                throw new AppException("Неизвестный метод запроса {$method}");
+                throw new HTTPException("Неизвестный метод запроса {$method}");
         }
 
         // Устанавливаем URL запроса
@@ -262,7 +267,7 @@ class HTTP
 
         // Проверяем ошибки cURL
         if ($errno) {
-            throw new AppException("Ошибка cURL #{$errno} ({$url}): {$error}");
+            throw new HTTPException("Ошибка cURL #{$errno} ({$url}): {$error}");
         }
 
         // Выводим заголовки и тело запроса
@@ -275,16 +280,15 @@ class HTTP
         $this->debug("[{$this->requestCounter}] <=== RESPONSE {$deltaTime}s ({$code})", self::DEBUG_URL);
         $this->debug(implode(PHP_EOL, $this->responseHeaders), self::DEBUG_HEADERS);
         $this->debug($this->response . PHP_EOL, self::DEBUG_CONTENT);
-
         return $this->decodeResponse($this->response, $code);
     }
 
     /**
      * Возвращает статус успешности выполнения запроса
-     * @param array $successStatisCodes Коды статуса НТТР Статус коды успешного выполнения запроса
+     * @param array $successStatusCodes Коды статуса НТТР Статус коды успешного выполнения запроса
      * @return boolean
      */
-    public function isSuccess(array $successStatusCodes = []) :bool
+    public function isSuccess(array $successStatusCodes = []): bool
     {
         if (! count($successStatusCodes)) {
             $successStatusCodes = $this->successStatusCodes;
@@ -300,7 +304,8 @@ class HTTP
      */
     public function getHTTPCode()
     {
-        return (int) $this->curlInfo['http_code'] ?? 0;
+        $code = (int) $this->curlInfo['http_code'];
+        return $code ?? 0;
     }
 
     /**
@@ -321,7 +326,7 @@ class HTTP
      * Возвращает заголовки последнего ответа
      * @return array
      */
-    public function getResponseHeaders() :array
+    public function getResponseHeaders(): array
     {
         return $this->responseHeaders;
     }
@@ -330,7 +335,7 @@ class HTTP
      * Возвращает информацию о последней операции cURL
      * @return array
      */
-    public function getCurlInfo() :array
+    public function getCurlInfo(): array
     {
         return $this->curlInfo;
     }
@@ -341,7 +346,7 @@ class HTTP
      * @param  array  $requestHeaders Заголовки запроса
      * @return string
      */
-    protected function buildQuery(array $params, array $requestHeaders) :string
+    private function buildQuery(array $params, array $requestHeaders): string
     {
         if (! count($params)) {
             return '';
@@ -353,12 +358,16 @@ class HTTP
                 $jsonParams = json_encode($params);
                 if ($jsonParams === false) {
                     $errorMessage = json_last_error_msg();
-                    throw new AppException("Не удалось закодировать в JSON ({$errorMessage}): " . print_r($params, true));
+                    throw new HTTPException(
+                        "Не удалось закодировать в JSON ({$errorMessage}): " .
+                        print_r($params, true)
+                    );
                 }
                 // Добавляем маркер BOM
                 if ($this->addBOM) {
                     $jsonParams = chr(239) . chr(187) . chr(191) . $jsonParams;
                 }
+
                 return $jsonParams;
             default:
                 return http_build_query($params);
@@ -371,7 +380,7 @@ class HTTP
      * @param  int    $code Статус код ответа
      * @return mixed
      */
-    protected function decodeResponse(string $response, int $code)
+    private function decodeResponse(string $response, int $code)
     {
         if ($code === 204) {
             return $response;
@@ -380,13 +389,14 @@ class HTTP
         $contentType = $this->getContentType($this->responseHeaders);
         switch ($contentType) {
             case 'json':
-                // Удаляем маркер ВОМ если он есть
+                // Удаляем маркер ВОМ (если он есть)
                 $response = ltrim($response, chr(239) . chr(187) . chr(191));
                 $decodedResponse = json_decode($response, true);
                 if (is_null($decodedResponse)) {
                     $errorMessage = json_last_error_msg();
-                    throw new AppException("Не удалось декодировать JSON ({$errorMessage}): {$response}");
+                    throw new HTTPException("Не удалось декодировать JSON ({$errorMessage}): {$response}");
                 }
+
                 break;
             default:
                 $decodedResponse = $response;
@@ -400,7 +410,7 @@ class HTTP
      * @param  array  $headers Заголовки запроса/ответа
      * @return string | null
      */
-    protected function getContentType(array $headers)
+    private function getContentType(array $headers)
     {
         foreach ($headers as $header) {
             $header = explode(':', $header, 2);
@@ -432,7 +442,7 @@ class HTTP
      * Обеспечивает троттлинг HTTP запросов
      * @return string|false $response
      */
-    protected function throttleCurl()
+    private function throttleCurl()
     {
         do {
             if (empty($this->throttle)) {
@@ -440,21 +450,17 @@ class HTTP
             }
 
             // Вычисляем необходимое время задержки перед отправкой запроса, микросекунды
-            $usleep = intval(1E6 * ($this->lastRequestTime + 1/$this->throttle - microtime(true)));
+            $usleep = (int)(1E6 * ($this->lastRequestTime + 1 / $this->throttle - microtime(true)));
             if ($usleep <= 0) {
                 break;
             }
 
-            $sleep = sprintf('%0.4f', $usleep/1E6);
+            $sleep = sprintf('%0.4f', $usleep / 1E6);
             $this->debug("[{$this->requestCounter}] ++++ THROTTLE ({$this->throttle}) {$sleep}s", self::DEBUG_URL);
-
             usleep($usleep);
         } while (false);
-
         $this->lastRequestTime = microtime(true);
-
         $response = curl_exec($this->curl);
-
         return $response;
     }
 
@@ -465,7 +471,7 @@ class HTTP
      * @return int Длина заголовка
      * @see https://stackoverflow.com/questions/9183178/can-php-curl-retrieve-response-headers-and-body-in-a-single-request
      */
-    protected function storeResponseHeaders($curl, string $header) :int
+    private function storeResponseHeaders($curl, string $header): int
     {
         $this->responseHeaders[] = trim($header);
         return strlen($header);
@@ -477,7 +483,7 @@ class HTTP
      * @param int Заданный уровень вывода отладочной информации
      * @return void
      */
-    protected function debug(string $message, int $debugLevel)
+    private function debug(string $message, int $debugLevel)
     {
         if (! ($this->debugLevel & $debugLevel)) {
             return;
@@ -503,8 +509,8 @@ class HTTP
                 return $absoluteFileName;
             }
             if ($createDir) {
-                if (! mkdir($checkDir, $mode = 0755, $recursive = true)) {
-                    throw new AppException("Не удалось создать каталог {$checkDir}");
+                if (!mkdir($checkDir, $mode = 0755, $recursive = true) && !is_dir($checkDir)) {
+                    throw new HTTPException("Не удалось создать каталог {$checkDir}");
                 }
                 return $absoluteFileName;
             }

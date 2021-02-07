@@ -1,7 +1,7 @@
 {
     "name": "andrey-tech/http-client-php",
-    "description": "Простой НТТР(S) клиент с троттлингом запросов",
-    "keywords": [ "http", "https", "client", "http-client", "https-client", "http-request", "https-sertificate", "throttling", "debug" ],
+    "description": "Простой НТТР(S) клиент на PHP7+ с троттлингом запросов и поддержкой маркера BOM в теле сообщения формата JSON",
+    "keywords": [ "http", "https", "client", "http-client", "https-client", "http-request", "https-sertificate", "throttling", "debug", "bom" ],
     "homepage": "https://github.com/andrey-tech/http-client-php",
     "minimum-stability": "stable",
     "license": "MIT",
@@ -13,11 +13,13 @@
         }
     ],
     "require": {
-        "php": ">=7.0"
+        "php": ">=7.0",
+        "ext-curl": "*",
+        "ext-json": "*"
     },
     "autoload": {
         "psr-4": {
-            "App\\": "src/App"
+            "App\\HTTP\\": "src/App/HTTP"
         }
     }
 }
