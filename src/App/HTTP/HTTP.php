@@ -8,7 +8,7 @@
  * @see https://github.com/andrey-tech/http-client-php
  * @license   MIT
  *
- * @version 3.0.0
+ * @version 3.0.1
  *
  * v1.0.0 (21.06.2019) Начальный релиз
  * v2.0.0 (21.07.2019) Изменения для App
@@ -29,6 +29,7 @@
  * v2.9.0 (15.06.2020) Добавлен параметр $raw в метод getResponse()
  * v2.9.1 (19.07.2020) Добавлен забытый метод PATCH
  * v3.0.0 (06.02.2021) Изменение пространства имен на \App\HTTP
+ * v3.0.1 (07.02.2021) Исправлен отладочный вывод заголовка для методов запроса GET и HEAD
  *
  */
 
@@ -243,13 +244,14 @@ class HTTP
             case 'PUT':
             case 'PATCH':
             case 'DELETE':
-                $this->debug("[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
                 curl_setopt($this->curl, CURLOPT_CUSTOMREQUEST, $method);
                 curl_setopt($this->curl, CURLOPT_POSTFIELDS, $query);
                 break;
             default:
                 throw new HTTPException("Неизвестный метод запроса {$method}");
         }
+
+        $this->debug(PHP_EOL . "[{$this->requestCounter}] ===> {$method} {$url}", self::DEBUG_URL);
 
         // Устанавливаем URL запроса
         curl_setopt($this->curl, CURLOPT_URL, $url);
